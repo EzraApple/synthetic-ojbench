@@ -1,24 +1,18 @@
 # Synthetic OJBench
 
-Generate verifiable programming problems and measure their difficulty against a small open model. Start with a local **OJBench baseline using Qwen3.5-9B through MLX**, then build synthetic data generation.
+This started after an onsite interview I didn't pass. The exercise involved generating synthetic tasks that were difficult enough for a model to fail on some attempts, but still within reach. I wanted to understand that process better, along with how the resulting data could be used for supervised fine-tuning (SFT) or reinforcement learning (RL).
 
-## Status
+I'm using this project to work through the whole process on a small scale: run a benchmark, generate useful training data, train a model, and see whether its score improves. Starting with a small model should make it easier to experiment locally and understand each step.
 
-Scaffold only. No dependencies, models, or datasets have been downloaded for this project. No inference, grading, or training has run. Upstream support has been checked; local MLX inference and judge execution remain untested. Setup and execution are deferred.
+The starting point is [Qwen3.5-9B](https://huggingface.co/Qwen/Qwen3.5-9B), which I plan to run locally with [MLX](https://github.com/ml-explore/mlx-lm), and [OJBench](https://github.com/He-Ren/OJBench), a competitive programming benchmark. Programming problems give me a concrete way to check whether a solution is correct and meets execution limits.
 
-## Structure
+The rough plan is to:
 
-```text
-pyproject.toml                 One Python package
-src/synthetic_ojbench/        Implementation, added as needed
-configs/ojbench-pilot.toml     One draft experiment configuration
-docs/experiment-plan.md       Protocol and setup steps
-```
+1. Get a local baseline and understand how benchmark evaluation works.
+2. Generate new programming problems with tests and reference solutions, then measure how often the model can solve them.
+3. Use that data for an SFT or RL training run. I haven't decided which approach to start with yet.
+4. Evaluate again on OJBench to see whether the synthetic data helped on problems kept out of training.
 
-Evaluation will load problems, ask the model for a solution, grade the code, and save results. Synthesis will generate and validate new problems, then reuse evaluation to measure their difficulty. Keep these as modules in the same package. Extract shared helpers when there is actual reuse.
+The goal is to complete an experiment and understand the choices along the way. The plan will change as I learn what works.
 
-MLX inference runs on macOS. OJBench grading needs a separate Linux environment; add its container definition with the grading implementation. Save local outputs under `artifacts/`, created by the runner and ignored by Git.
-
-Add tests alongside behavior, and a lockfile when dependencies are selected. There is no CLI yet. Training is outside the current scope.
-
-See the [experiment plan](docs/experiment-plan.md) for the baseline and synthetic-data milestones.
+**Current status:** initial scaffold and compatibility research. No baseline or training results yet.
