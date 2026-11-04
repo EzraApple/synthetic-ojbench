@@ -4,7 +4,7 @@ This started after an onsite interview I didn't pass. The exercise involved gene
 
 I'm using this project to work through the whole process on a small scale: run a benchmark, generate useful training data, train a model, and see whether its score improves. Starting with a small model should make it easier to experiment locally and understand each step.
 
-The starting point is [Qwen3.5-9B](https://huggingface.co/Qwen/Qwen3.5-9B), which I plan to run locally with [MLX](https://github.com/ml-explore/mlx-lm), and [OJBench](https://github.com/He-Ren/OJBench), a competitive programming benchmark. Programming problems give me a concrete way to check whether a solution is correct and meets execution limits.
+The starting point is [Qwen3.5-9B](https://huggingface.co/Qwen/Qwen3.5-9B), running locally with [MLX](https://github.com/ml-explore/mlx-lm), and [OJBench](https://github.com/He-Ren/OJBench), a competitive programming benchmark. Programming problems give me a concrete way to check whether a solution is correct and meets execution limits.
 
 The rough plan is to:
 
@@ -15,7 +15,7 @@ The rough plan is to:
 
 The goal is to complete an experiment and understand the choices along the way. The plan will change as I learn what works.
 
-**Current status:** the local C++ judge passes smoke tests on Apple Silicon. No model baseline or training results yet.
+**Current status:** the local C++ judge passes smoke tests on Apple Silicon, and the first MLX-generated addition solution was accepted. This verifies the model-to-judge path. No OJBench baseline or training results yet.
 
 ## Local judge
 
@@ -47,3 +47,20 @@ PYTHONPATH=src python3.11 -m synthetic_ojbench.grading \
 Each batch uses one container and grades submissions sequentially. The output directory must be new. It records inputs, per-submission results, judge logs, and the image identity and run settings. `status: error` means grading failed; it is not a wrong answer. The wrapper removes the container after completion or timeout and leaves the files for inspection.
 
 The pinned evaluator uses a 10-second program time limit and a 1 GiB program memory limit. The wrapper's `--timeout` is a separate whole-batch deadline, defaulting to 300 seconds. The ARM64 compiler target is explicit because this DMOJ version mishandles an unset target. Its nonfatal syscall-403 seccomp warning is retained in logs; the sandbox and verdict checks above pass with it.
+
+## One model-generated solution
+
+Install the locked MLX dependencies on Apple Silicon:
+
+```sh
+uv sync --locked --extra inference --python python3.11
+```
+
+With the judge image built, generate and grade one solution to the independent addition fixture:
+
+```sh
+uv run --locked --extra inference python examples/grade_one_solution.py \
+  --output artifacts/model-smoke
+```
+
+This downloads about 19 GB of BF16 weights on the first run and reuses the Hugging Face cache afterward. The example pins the model revision, enables thinking, and caps generation at 1,024 tokens. It saves the prompt, response, timing, memory use, and judge results in a new output directory. This checks the model-to-judge path; it does not download or evaluate the OJBench problem set.

@@ -5,6 +5,9 @@ description = "Local programming benchmarks and verifiable synthetic task genera
 requires-python = ">=3.11"
 dependencies = []
 
+[project.optional-dependencies]
+inference = ["mlx-lm==0.32.2", "mlx==0.32.4"]
+
 [build-system]
 requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
