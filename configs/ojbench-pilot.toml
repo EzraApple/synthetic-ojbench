@@ -1,0 +1,28 @@
+# Planning record only: no config loader or experiment runner exists yet.
+status = "draft"
+benchmark = "OJBench"
+model = "Qwen/Qwen3.5-9B"
+backend = "mlx-lm"
+proposed_precision = "bf16"
+proposed_language = "cpp"
+proposed_cpp_standard = "c++17"
+proposed_problem_count = 12
+proposed_attempts_per_problem = 1
+feedback_rounds = 0
+scoring = "full_test_acceptance"
+
+# Resolve these explicitly before executing; do not silently supply defaults.
+unresolved = [
+  "MLX version and model compatibility",
+  "Weight revision, conversion provenance, tokenizer, and chat template",
+  "Thinking mode, stop handling, sampling parameters, and seed policy",
+  "Context and output token limits",
+  "Dataset/evaluator revisions and selected problem IDs",
+  "Judge image, architecture, compiler, and execution limits",
+  "Run wall-time limit and concurrency",
+]
+
+[proposed_difficulty_counts]
+easy = 4
+medium = 4
+hard = 4
