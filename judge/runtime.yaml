@@ -1,0 +1,3 @@
+g++17: /usr/bin/g++
+# The pinned executor passes an empty argument for null; use a portable ARM64 target.
+gcc_target_arch: armv8-a

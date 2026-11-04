@@ -1,0 +1,4 @@
+test_cases:
+  - in: cases.in
+    out: cases.out
+    points: 1

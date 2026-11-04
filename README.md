@@ -15,4 +15,35 @@ The rough plan is to:
 
 The goal is to complete an experiment and understand the choices along the way. The plan will change as I learn what works.
 
-**Current status:** initial scaffold and compatibility research. No baseline or training results yet.
+**Current status:** the local C++ judge passes smoke tests on Apple Silicon. No model baseline or training results yet.
+
+## Local judge
+
+Requires Docker with its Linux engine running and Python 3.11+. The current image targets native ARM64 and grades C++17 submissions using pinned OJBench and DMOJ revisions. No model or benchmark dataset is needed for these checks.
+
+Build the image:
+
+```sh
+docker build --platform linux/arm64 -t synthetic-ojbench-judge:local judge
+```
+
+Run the smoke tests:
+
+```sh
+OJ_JUDGE_SMOKE=1 PYTHONPATH=src python3.11 -m unittest discover -s tests -v
+```
+
+The tests check accepted, wrong-answer, compile-error, timeout, and nonzero-exit verdicts. They also check missing-problem errors, container cleanup after a batch timeout, and blocked access to test answers and result files. Logs and results stay in `artifacts/judge-smoke-*/`. Omit `OJ_JUDGE_SMOKE=1` to run only the host-side tests without Docker.
+
+To grade saved submissions, use one JSON object per line with `id`, `language` (`cpp`), and `content` (the model response or code). Problem directories contain DMOJ problem packages, with an `init.yml` and test files per problem. Independent examples are in `tests/fixtures/problems/`.
+
+```sh
+PYTHONPATH=src python3.11 -m synthetic_ojbench.grading \
+  --submissions submissions.jsonl \
+  --problems path/to/problems \
+  --output artifacts/my-run
+```
+
+Each batch uses one container and grades submissions sequentially. The output directory must be new. It records inputs, per-submission results, judge logs, and the image identity and run settings. `status: error` means grading failed; it is not a wrong answer. The wrapper removes the container after completion or timeout and leaves the files for inspection.
+
+The pinned evaluator uses a 10-second program time limit and a 1 GiB program memory limit. The wrapper's `--timeout` is a separate whole-batch deadline, defaulting to 300 seconds. The ARM64 compiler target is explicit because this DMOJ version mishandles an unset target. Its nonfatal syscall-403 seccomp warning is retained in logs; the sandbox and verdict checks above pass with it.
