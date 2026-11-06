@@ -11,6 +11,7 @@ from mlx_lm import load, stream_generate
 from mlx_lm.sample_utils import make_sampler
 
 from synthetic_ojbench.grading import grade_submissions
+from synthetic_ojbench.pilot import extract_final_response
 
 MODEL = "mlx-community/Qwen3.5-9B-bf16"
 REVISION = "27cdb77d9381d508abfe5d4e06bcb95471e312ac"
@@ -67,8 +68,11 @@ def main():
         "peak_memory_gb": final.peak_memory, "finish_reason": final.finish_reason,
     }
     (args.output / "generation.json").write_text(json.dumps(metrics, indent=2) + "\n")
-    submission = {"id": "addition", "language": "cpp",
-                  "content": (args.output / "response.txt").read_text()}
+    answer = extract_final_response((args.output / "response.txt").read_text(), thinking=True)
+    (args.output / "final.txt").write_text(answer)
+    if not answer.strip():
+        raise RuntimeError("No final answer within the token budget; reasoning drafts were not graded")
+    submission = {"id": "addition", "language": "cpp", "channel": "final", "content": answer}
     path = args.output / "submissions.jsonl"
     path.write_text(json.dumps(submission) + "\n")
     problems = Path(__file__).resolve().parents[1] / "tests/fixtures/problems"
