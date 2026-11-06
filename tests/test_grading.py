@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -19,6 +20,18 @@ def write_submissions(path, programs):
 
 
 class GradingFailureTests(unittest.TestCase):
+    def test_problem_ids_cannot_escape_the_problem_directory(self):
+        for identifier in ("", ".", "..", "../addition", "/addition", "path\\addition", "bad\0id"):
+            with self.subTest(identifier=identifier), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                inputs, output = root / "input.jsonl", root / "output"
+                inputs.write_text(json.dumps({"id": identifier, "language": "cpp", "content": CPP}) + "\n")
+                with patch("synthetic_ojbench.grading.subprocess.run") as docker:
+                    with self.assertRaisesRegex(ValueError, "simple directory names"):
+                        grade_submissions(inputs, [FIXTURES / "problems"], output)
+                    docker.assert_not_called()
+                self.assertFalse(output.exists())
+
     def test_cleanup_failure_does_not_report_success(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -119,6 +132,59 @@ class JudgeSmokeTests(unittest.TestCase):
         self.assertEqual([r["is_passed"] for r in results], [True, False, False, False, False])
         self.assert_container_removed(output)
 
+    def test_eof_compatibility_changes_only_validator_flags_and_keeps_tests_private(self):
+        problem = self.root / "eof-problems" / "eof-checker"
+        problem.mkdir(parents=True)
+        config = '''checker:
+  name: bridged
+  args:
+    files: [validator.cpp]
+    lang: CPP17
+    type: default
+test_cases:
+- in: cases.in
+  out: cases.out
+  points: 1
+'''
+        (problem / "init.yml").write_text(config)
+        (problem / "cases.in").write_text("2 3\n")
+        (problem / "cases.out").write_text("5\n")
+        (problem / "validator.cpp").write_text('''#include <fstream>
+#include <string>
+bool eof(std::istream& in) {
+    in >> std::ws;
+    char c = in.get();
+    if(c == std::char_traits<char>::eof()) return true;
+    return false;
+}
+int main(int argc, char** argv) {
+    std::ifstream output(argv[2]), answer(argv[3]);
+    std::string got, expected;
+    if(!(output >> got) || !(answer >> expected) || got != expected) return 1;
+    return eof(output) ? 0 : 1;
+}
+''')
+        # Contestant plain-char behavior must remain the ARM64 default.
+        correct = "#include <limits>\n" + CPP.replace(
+            "int main(){", "int main(){if(std::numeric_limits<char>::is_signed)return 1;")
+        leak = '''#include <fstream>
+#include <iostream>
+int main(){std::ifstream f("/output/compatibility/problems/eof-checker/cases.out");
+if(!f)return 42;std::cout<<f.rdbuf();}
+'''
+        inputs, output = self.root / "eof.jsonl", self.root / "eof-results"
+        entries = [{"id": "eof-checker", "attempt_id": name, "language": "cpp", "content": code}
+                   for name, code in (("correct", correct), ("wrong", CPP.replace("a+b", "a-b")), ("leak", leak))]
+        inputs.write_text("".join(json.dumps(entry) + "\n" for entry in entries))
+        results = grade_submissions(inputs, [problem.parent], output)
+        self.assertEqual([row["verdict"] for row in results], ["AC", "WA", "IR"])
+        metadata = json.loads((output / "run.json").read_text())
+        overlay = metadata["compatibility"]["overlays"][0]
+        self.assertEqual(overlay["problem_id"], "eof-checker")
+        self.assertEqual(overlay["changes"][0]["flags"], ["-fsigned-char"])
+        self.assertEqual((problem / "init.yml").read_text(), config)
+        self.assert_container_removed(output)
+
     def test_submission_cannot_read_tests_or_write_results(self):
         inputs, output = self.root / "isolation.jsonl", self.root / "isolation"
         source = '''#include <fstream>
@@ -141,6 +207,20 @@ int main() {
         self.assertEqual(results[0]["status"], "error")
         self.assertIsNone(results[0]["is_passed"])
         self.assertIsNone(results[0]["verdict"])
+        self.assert_container_removed(output)
+
+    def test_invalid_problem_config_does_not_drop_other_results(self):
+        problems = self.root / "mixed-problems"
+        shutil.copytree(FIXTURES / "problems" / "addition", problems / "addition")
+        invalid = problems / "invalid"
+        invalid.mkdir()
+        (invalid / "init.yml").write_text("checker: [\n")
+        inputs, output = self.root / "mixed.jsonl", self.root / "mixed-results"
+        inputs.write_text("".join(json.dumps({"id": name, "language": "cpp", "content": CPP}) + "\n"
+                                  for name in ("invalid", "addition")))
+        results = grade_submissions(inputs, [problems], output)
+        self.assertEqual([(row["status"], row["verdict"]) for row in results],
+                         [("error", None), ("graded", "AC")])
         self.assert_container_removed(output)
 
     def test_batch_deadline_stops_the_container(self):

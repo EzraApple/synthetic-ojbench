@@ -36,6 +36,10 @@ def grade_submissions(
     for entry in entries:
         if not isinstance(entry, dict) or type(entry.get("id")) not in (str, int):
             raise ValueError("Each submission needs a string or integer id")
+        identifier = entry["id"]
+        if isinstance(identifier, str) and (not identifier or identifier in {".", ".."}
+                                           or any(char in identifier for char in ("/", "\\", "\0"))):
+            raise ValueError("Problem IDs must be simple directory names")
         if entry.get("language") != "cpp" or not isinstance(entry.get("content"), str):
             raise ValueError("Each submission needs language='cpp' and string content")
 
@@ -75,6 +79,9 @@ def grade_submissions(
         metadata["command"] = command
         with (output_dir / "judge.log").open("w") as log:
             subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, check=True, timeout=timeout)
+        compatibility = output_dir / "compatibility.json"
+        if compatibility.exists():
+            metadata["compatibility"] = json.loads(compatibility.read_text())
         results = [json.loads(line) for line in (output_dir / "results.jsonl").read_text().splitlines()]
         if len(results) != len(entries):
             raise JudgeError("Judge returned an incomplete batch")

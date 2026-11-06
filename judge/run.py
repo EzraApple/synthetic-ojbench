@@ -6,6 +6,7 @@ import traceback
 from pathlib import Path
 
 import ojbench
+from compatibility import prepare_problem_dirs
 
 
 def grade_entry(entry):
@@ -33,15 +34,18 @@ def grade_entry(entry):
 
 
 def main():
+    entries = [json.loads(line) for line in Path("/input/submissions.jsonl").read_text().splitlines() if line.strip()]
+    problem_ids = {f"loj-{entry['id']}" if type(entry["id"]) is int else entry["id"] for entry in entries}
+    problem_dirs = prepare_problem_dirs([Path(path) for path in sys.argv[1:]], problem_ids, Path("/output"))
     ojbench.init(
-        problem_dirs=[Path(path) for path in sys.argv[1:]],
+        problem_dirs=problem_dirs,
         config_path="/opt/judge/config.yaml",
         runtime_path="/opt/judge/runtime.yaml",
         compile_lock_path="/tmp/compile.lock",
     )
-    with Path("/input/submissions.jsonl").open() as inputs, Path("/output/results.jsonl").open("w") as outputs:
-        for line in inputs:
-            result = grade_entry(json.loads(line))
+    with Path("/output/results.jsonl").open("w") as outputs:
+        for entry in entries:
+            result = grade_entry(entry)
             outputs.write(json.dumps(result) + "\n")
             outputs.flush()
 

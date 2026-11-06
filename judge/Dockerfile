@@ -3,7 +3,8 @@ FROM python:3.11-slim-bookworm@sha256:94a8fee35252d06ab75856f15f12c7bae67b10e8a6
 ARG DMOJ_REVISION=f098cd3a49a60186d1fadde5132329ec5f4f2213
 ARG OJBENCH_REVISION=5e94480b1e135b98855cf5bc81213c256aff5b17
 LABEL org.synthetic-ojbench.dmoj-revision=$DMOJ_REVISION \
-      org.synthetic-ojbench.ojbench-revision=$OJBENCH_REVISION
+      org.synthetic-ojbench.ojbench-revision=$OJBENCH_REVISION \
+      org.synthetic-ojbench.compatibility="signed-char-eof-v1"
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 DMOJ_PARALLEL=2
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -18,7 +19,7 @@ RUN git init /opt/ojbench \
     && pip install --no-cache-dir --no-build-isolation -e /opt/ojbench
 
 WORKDIR /opt/judge
-COPY run.py config.yaml runtime.yaml ./
+COPY run.py compatibility.py config.yaml runtime.yaml ./
 RUN pip freeze > dependencies.txt && useradd --uid 1000 --create-home judge
 USER judge
 ENTRYPOINT ["python", "/opt/judge/run.py"]
